@@ -60,8 +60,13 @@ const formatMermaidBlock = (value: string): string => {
     .trim()
     .replace(/^```(?:mermaid)?\s*\n/i, '')
     .replace(/\n```$/i, '');
+  const hasDiagramType =
+    /^(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|quadrantChart|requirementDiagram|gitGraph|mindmap|timeline|zenuml|sankey-beta|xychart-beta|block-beta|packet-beta|architecture-beta)\b/i.test(
+      content
+    );
+  const normalized = content && !hasDiagramType ? `flowchart LR\n${content}` : content;
 
-  return formatCodeBlock(content, 'mermaid');
+  return formatCodeBlock(normalized, 'mermaid');
 };
 
 const formatInlineCode = (value: string): string => {

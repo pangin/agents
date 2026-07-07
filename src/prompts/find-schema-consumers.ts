@@ -27,7 +27,7 @@ ${catalogUrl ? `\nThe hosted EventCatalog URL is ${catalogUrl}. Use this when re
 4. A resource (E.g service) that sends the message is the producer, not a consumer; focus on consumers that could break.
 5. Return each affected consumer with its id, version, type, summary, owners, path relative to the catalog root, and a short reason explaining why it is affected.
 6. Use the consumer summary and owners from the catalog front matter or the \`dump_catalog\` result. If a consumer has no summary, return an empty string. If it has no owners, return an empty owners array.
-7. Return a useful Mermaid flowchart in \`diagram\`. Follow the Mermaid diagram conventions from your agent instructions. Use only real resource ids you found in the catalog. Use an empty string if you cannot resolve enough resources for a useful diagram.
+7. Return a useful Mermaid flowchart in \`diagram\`. The first non-empty line must be \`flowchart LR\`. Follow the Mermaid diagram conventions from your agent instructions. Use only real resource ids you found in the catalog. Use an empty string if you cannot resolve enough resources for a useful diagram.
 
 If you cannot resolve the schema to a catalog resource, or it has no consumers, return an empty consumers array and an empty diagram. Do not invent resources; only report consumers you can find in the catalog.`;
 

@@ -120,6 +120,7 @@ test('instructs the consumer tracer to return consumer metadata and a Mermaid di
   const prompt = buildFindSchemaConsumersPrompt(breakingResult, '/tmp/catalog');
   expect(prompt).toContain('summary, owners, path relative to the catalog root');
   expect(prompt).toContain('Return a useful Mermaid flowchart in `diagram`.');
+  expect(prompt).toContain('The first non-empty line must be `flowchart LR`.');
   expect(prompt).toContain('Follow the Mermaid diagram conventions from your agent instructions.');
   expect(prompt).not.toContain('service: pink (#ec4899)');
 });
@@ -127,6 +128,7 @@ test('instructs the consumer tracer to return consumer metadata and a Mermaid di
 test('keeps Mermaid color and edge-label rules in the breaking-changes agent instructions', () => {
   const instructions = buildBreakingChangesInstructions('/tmp/source', '/tmp/catalog');
   expect(instructions).toContain('When a structured response asks for a Mermaid diagram');
+  expect(instructions).toContain('The first non-empty line MUST be `flowchart LR`.');
   expect(instructions).toContain('Label edges with the relationship they represent');
   expect(instructions).toContain('-- receives -->');
   expect(instructions).toContain('Color-code nodes by EventCatalog resource type');

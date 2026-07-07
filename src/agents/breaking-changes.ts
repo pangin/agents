@@ -53,6 +53,8 @@ NOT breaking.
 // Mermaid diagrams
 When a structured response asks for a Mermaid diagram:
 - Return raw Mermaid flowchart syntax only. Do not wrap it in markdown fences.
+- The first non-empty line MUST be \`flowchart LR\`. GitHub cannot render Mermaid snippets that
+  start with nodes, edges, \`classDef\`, or \`class\` statements.
 - Show the producer or owning resource, the changed contract, and the affected consumers.
 - Label edges with the relationship they represent, for example \`-- sends -->\`, \`-- contract -->\`,
   or \`-- receives -->\`. Do not return unlabeled arrows unless the relationship is genuinely unknown.

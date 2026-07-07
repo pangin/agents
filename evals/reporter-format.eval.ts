@@ -111,3 +111,36 @@ test('links affected consumers and owners when a hosted catalog URL is configure
   );
   expect(comment).toContain('- Owners: [ordering-platform](https://demo.eventcatalog.dev/docs/teams/ordering-platform)');
 });
+
+test('adds a Mermaid flowchart declaration when the model omits it', () => {
+  const reports: BreakingSchemaReport[] = [
+    {
+      breakingChange: {
+        fileName: 'src/contracts/schemas/create-order.schema.json',
+        isBreaking: true,
+        confidence: 'high',
+        summary: 'The create-order command changed shape.',
+        breakingChanges: [
+          {
+            change: 'Changed `total` to `totals`.',
+            lines: '+ \"totals\": { \"type\": \"object\" }',
+          },
+        ],
+      },
+      consumers: [],
+      diagram: [
+        'classDef service fill:#fdf2f8,stroke:#ec4899,color:#9a3412;',
+        'classDef command fill:#e0f2fe,stroke:#3b82f6,color:#1e3a8a;',
+        'CheckoutOrchestrator service;',
+        'CreateOrder command;',
+        'OrderService service;',
+        'CheckoutOrchestrator -- sends --> CreateOrder;',
+        'CreateOrder -- receives --> OrderService;',
+      ].join('\n'),
+    },
+  ];
+
+  const comment = formatBreakingChangesComment(reports);
+
+  expect(comment).toContain('```mermaid\nflowchart LR\nclassDef service');
+});
