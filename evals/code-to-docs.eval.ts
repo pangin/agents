@@ -1,6 +1,6 @@
 import { expect } from 'vitest';
 import { describeEval } from 'vitest-evals';
-import { codeToDocsHarness, hasModelCredentials } from './support/harness';
+import { codeToDocsHarness, shouldSkipLiveModelEval } from './support/harness';
 import type { AgentEvalOutput } from './support/harness';
 import { reportRun } from './support/report';
 import { scoreImpactPlan, type ImpactPlanExpectation } from './support/scorers';
@@ -39,7 +39,7 @@ const changedList = (output: AgentEvalOutput): string => output.catalogChanges.m
 
 describeEval(
   'code-to-docs agent: turning source-code PRs into EventCatalog documentation',
-  { harness: codeToDocsHarness, skipIf: () => !hasModelCredentials() },
+  { harness: codeToDocsHarness, skipIf: shouldSkipLiveModelEval },
   (it) => {
     it('documents a brand-new event: plans it, then writes the event doc + schema and nothing else', async ({ run }) => {
       const { output } = await run(orderRefunded.input);

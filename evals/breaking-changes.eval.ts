@@ -1,7 +1,7 @@
 import { expect } from 'vitest';
 import { describeEval } from 'vitest-evals';
 import { breakingChangesHarness, type BreakingChangesEvalOutput } from './support/breaking-changes-harness';
-import { hasModelCredentials } from './support/harness';
+import { shouldSkipLiveModelEval } from './support/harness';
 import { scoreBreakingChange, scoreConsumers } from './support/breaking-changes-scorers';
 import type { BreakingChangeExpectation, ConsumersExpectation } from './support/breaking-changes-scorers';
 import { orderConfirmedBreaking, orderConfirmedAdditive } from './fixtures/breaking-change-order-confirmed/scenario';
@@ -45,7 +45,7 @@ const expectConsumers = (output: BreakingChangesEvalOutput, expectation: Consume
 
 describeEval(
   'breaking-changes agent: scoring schema changes and finding affected consumers',
-  { harness: breakingChangesHarness, skipIf: () => !hasModelCredentials() },
+  { harness: breakingChangesHarness, skipIf: shouldSkipLiveModelEval },
   (it) => {
     it('flags a removed required field as breaking and traces it to the consuming service', async ({ run }) => {
       const { output } = await run(orderConfirmedBreaking.input);

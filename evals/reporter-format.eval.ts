@@ -67,7 +67,47 @@ test('formats breaking-change diff snippets as top-level fenced code blocks', ()
   expect(comment).toContain(
     '- InventoryService (0.0.2) - Keeps inventory in sync with confirmed orders.\n  - Reason: Receives OrderConfirmed and depends on this payload.\n  - Owners: inventory-team'
   );
+  expect(comment).not.toContain('https://catalog.example.com/docs/services/InventoryService/0.0.2');
+  expect(comment).not.toContain('https://catalog.example.com/docs/teams/inventory-team');
   expect(comment).not.toContain('| Name | Version | Summary | Owners | Why affected | Path |');
   expect(comment).not.toContain('/domains/Orders/services/InventoryService');
   expect(comment).not.toMatch(/^  `{3,}/m);
+});
+
+test('links affected consumers and owners when a hosted catalog URL is configured', () => {
+  const reports: BreakingSchemaReport[] = [
+    {
+      breakingChange: {
+        fileName: 'src/contracts/schemas/create-order.schema.json',
+        isBreaking: true,
+        confidence: 'high',
+        summary: 'Changing totals makes existing create-order payloads invalid.',
+        breakingChanges: [
+          {
+            change: 'Changed `total` to required `totals` object.',
+            lines: '+ \"totals\": { \"type\": \"object\" }',
+          },
+        ],
+      },
+      consumers: [
+        {
+          id: 'order-service',
+          version: '1.0.0',
+          type: 'service',
+          summary: 'The system of record for orders.',
+          owners: ['ordering-platform'],
+          path: 'domains/Orders/services/order-service',
+          reason: 'Receives the create-order command.',
+        },
+      ],
+      diagram: '',
+    },
+  ];
+
+  const comment = formatBreakingChangesComment(reports, 'https://demo.eventcatalog.dev/');
+
+  expect(comment).toContain(
+    '- [order-service](https://demo.eventcatalog.dev/docs/services/order-service/1.0.0) (1.0.0) - The system of record for orders.'
+  );
+  expect(comment).toContain('- Owners: [ordering-platform](https://demo.eventcatalog.dev/docs/teams/ordering-platform)');
 });

@@ -6,6 +6,7 @@ export interface ReviewPayload {
   catalogRef?: string;
   catalogRepo?: string;
   catalogToken?: string;
+  catalogUrl?: string;
   githubRepository?: string;
   githubToken?: string;
   headSha?: string;
@@ -29,6 +30,8 @@ export interface ReviewConfig {
   catalogRef: string;
   catalogRepo?: string;
   catalogToken?: string;
+  /** Hosted EventCatalog base URL, used to link catalog resources in PR comments. */
+  catalogUrl?: string;
   github?: GithubReviewTarget;
   headSha?: string;
   ignorePaths: string[];
@@ -98,6 +101,7 @@ export const resolveConfig = (payload: ReviewPayload | undefined, env: NodeJS.Pr
     catalogRef: p.catalogRef || env.EVENTCATALOG_CATALOG_REF || 'main',
     catalogRepo: p.catalogRepo || env.EVENTCATALOG_CATALOG_REPO,
     catalogToken: p.catalogToken || env.EVENTCATALOG_CATALOG_TOKEN,
+    catalogUrl: p.catalogUrl || env.EVENTCATALOG_CATALOG_URL,
     github: parseGithubTarget(p, env),
     headSha: p.headSha || env.EVENTCATALOG_HEAD_SHA,
     ignorePaths: ignorePaths.length > 0 ? ignorePaths : DEFAULT_DIFF_IGNORE_PATHS,

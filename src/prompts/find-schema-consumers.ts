@@ -9,12 +9,17 @@ import { schemaConsumersResponse, type BreakingChangeResponse, type SchemaConsum
  * This file is the single source of truth for the prompt wording. Edit it in
  * `buildFindSchemaConsumersPrompt`.
  */
-export const buildFindSchemaConsumersPrompt = (breakingChange: BreakingChangeResponse, catalogPath: string): string =>
+export const buildFindSchemaConsumersPrompt = (
+  breakingChange: BreakingChangeResponse,
+  catalogPath: string,
+  catalogUrl?: string
+): string =>
   'A breaking schema change was detected in this pull request:\n\n' +
   JSON.stringify(breakingChange, null, 2) +
   `\n\nThis is a READ-ONLY analysis step. You MUST NOT create, edit, write, or delete any files.
 
 Use the \`dump_catalog\` tool to get an index of the EventCatalog (${catalogPath}), then use your read, grep, and glob tools to trace this schema to the resources that depend on it.
+${catalogUrl ? `\nThe hosted EventCatalog URL is ${catalogUrl}. Use this when reasoning about public catalog links, but still return structured resource ids, versions, owner ids, and paths exactly as requested below.\n` : ''}
 
 1. Resolve which catalog resource this schema belongs to. The schema file is usually attached to a message (event, command, or query), but may belong to a service or domain.
 2. If you can find the resource (e.g message/service/domain) the schema belong too, then you have the resource id and version in the markdown file.
@@ -30,9 +35,10 @@ If you cannot resolve the schema to a catalog resource, or it has no consumers, 
 export const findSchemaConsumers = async (
   session: FlueSession,
   breakingChange: BreakingChangeResponse,
-  catalogPath: string
+  catalogPath: string,
+  catalogUrl?: string
 ): Promise<SchemaConsumersResponse> => {
-  const response = await session.prompt(buildFindSchemaConsumersPrompt(breakingChange, catalogPath), {
+  const response = await session.prompt(buildFindSchemaConsumersPrompt(breakingChange, catalogPath, catalogUrl), {
     result: schemaConsumersResponse,
   });
 

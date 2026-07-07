@@ -12,6 +12,9 @@ inputs:
   catalog-token:
     description: Optional token used to check out the EventCatalog repository. Defaults to github.token.
     required: false
+  catalog-url:
+    description: Optional URL of your hosted EventCatalog. When provided, breaking-changes comments link affected resources and owners to the catalog.
+    required: false
   model:
     description: 'Model specifier for the documentation agent. See available models: https://pi.dev/models'
     required: false
@@ -63,6 +66,7 @@ runs:
         EVENTCATALOG_CATALOG_REPO: ${{ inputs.catalog-repo }}
         EVENTCATALOG_CATALOG_PATH: eventcatalog
         EVENTCATALOG_CATALOG_TOKEN: ${{ inputs.catalog-token || github.token }}
+        EVENTCATALOG_CATALOG_URL: ${{ inputs.catalog-url }}
         EVENTCATALOG_GITHUB_REPOSITORY: ${{ github.repository }}
         EVENTCATALOG_GITHUB_TOKEN: ${{ github.token }}
         EVENTCATALOG_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -71,7 +75,7 @@ runs:
         EVENTCATALOG_AGENT: ${{ inputs.agent }}
         EVENTCATALOG_SCHEMA_EXTENSIONS: ${{ inputs.schema-extensions }}
       run: |
-        payload="$(node --input-type=module -e 'console.log(JSON.stringify({ baseSha: process.env.EVENTCATALOG_BASE_SHA || undefined, catalogPath: process.env.EVENTCATALOG_CATALOG_PATH, catalogRepo: process.env.EVENTCATALOG_CATALOG_REPO, headSha: process.env.EVENTCATALOG_HEAD_SHA || undefined, ignorePaths: process.env.EVENTCATALOG_IGNORE_PATHS, model: process.env.EVENTCATALOG_MODEL, schemaExtensions: process.env.EVENTCATALOG_SCHEMA_EXTENSIONS || undefined, workspace: process.env.GITHUB_WORKSPACE }))')"
+        payload="$(node --input-type=module -e 'console.log(JSON.stringify({ baseSha: process.env.EVENTCATALOG_BASE_SHA || undefined, catalogPath: process.env.EVENTCATALOG_CATALOG_PATH, catalogRepo: process.env.EVENTCATALOG_CATALOG_REPO, catalogUrl: process.env.EVENTCATALOG_CATALOG_URL || undefined, headSha: process.env.EVENTCATALOG_HEAD_SHA || undefined, ignorePaths: process.env.EVENTCATALOG_IGNORE_PATHS, model: process.env.EVENTCATALOG_MODEL, schemaExtensions: process.env.EVENTCATALOG_SCHEMA_EXTENSIONS || undefined, workspace: process.env.GITHUB_WORKSPACE }))')"
 
         # Map the requested agent to its Flue workflow. To run more than one agent, add another
         # step (or workflow file) with a different `agent`.

@@ -97,7 +97,8 @@ When a pull request is opened, the Breaking Changes agent:
    resource it belongs to and finds the services and flows that consume it (the producer that sends
    the message is not counted).
 5. **Comments on the source PR** with each breaking change, its highlighted lines, and the consumers
-   that could be affected. If no consumers are found, it logs that and skips the comment.
+   that could be affected. If `catalog-url` is configured, affected consumers and owner teams link to
+   your hosted catalog. If no consumers are found, it logs that and skips the comment.
 
 ## Get started
 
@@ -131,6 +132,7 @@ jobs:
         with:
           agent: code-to-docs # or: breaking-changes
           catalog-repo: your-org/your-catalog
+          catalog-url: https://catalog.example.com
           catalog-token: ${{ secrets.EVENTCATALOG_TOKEN }}
 ```
 
@@ -151,6 +153,7 @@ second workflow file):
   with:
     agent: code-to-docs
     catalog-repo: your-org/your-catalog
+    catalog-url: https://catalog.example.com
     catalog-token: ${{ secrets.EVENTCATALOG_TOKEN }}
 
 - uses: event-catalog/agents@main
@@ -159,6 +162,7 @@ second workflow file):
   with:
     agent: breaking-changes
     catalog-repo: your-org/your-catalog
+    catalog-url: https://catalog.example.com
     catalog-token: ${{ secrets.EVENTCATALOG_TOKEN }}
 ```
 
@@ -172,6 +176,7 @@ second workflow file):
 | `catalog-repo`      | Yes      |                               | EventCatalog repository to read/document, in `owner/repo` format.                                                                                 |
 | `catalog-ref`       | No       | `main`                        | Branch checked out from the catalog repository and targeted by documentation PRs.                                                                 |
 | `catalog-token`     | No       | `github.token`                | Token used to check out the catalog repository and open documentation pull requests.                                                              |
+| `catalog-url`       | No       |                               | URL of your hosted EventCatalog. When set, Breaking Changes comments link affected consumers and owner teams to catalog pages.                    |
 | `model`             | No       | `anthropic/claude-sonnet-4-6` | Model specifier for the agent. See [available models](https://pi.dev/models).                                                                     |
 | `ignore-paths`      | No       | see [action.yml](action.yml)  | Comma-separated paths or glob patterns to ignore in PR diffs.                                                                                     |
 | `schema-extensions` | No       | see [action.yml](action.yml)  | Comma-separated file extensions the Breaking Changes agent treats as message schemas. Add others (e.g. `.js`) to match where your contracts live. |

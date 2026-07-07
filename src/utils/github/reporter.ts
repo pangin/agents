@@ -74,6 +74,65 @@ const formatInlineCode = (value: string): string => {
 
 const formatInlineText = (value: string): string => value.replace(/\s+/g, ' ').trim();
 
+const formatMarkdownLink = (label: string, url: string): string => `[${label.replace(/[[\]\\]/g, '\\$&')}](${url})`;
+
+const normalizeCatalogUrl = (catalogUrl: string | undefined): string | undefined => {
+  const trimmed = catalogUrl?.trim().replace(/\/+$/, '');
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  return trimmed.replace(/\/docs$/i, '');
+};
+
+const encodeUrlSegment = (segment: string): string => encodeURIComponent(segment.trim());
+
+const getResourceRoute = (type: string): string => {
+  const routes: Record<string, string> = {
+    adr: 'adrs',
+    agent: 'agents',
+    channel: 'channels',
+    command: 'commands',
+    container: 'containers',
+    'data-product': 'data-products',
+    dataProduct: 'data-products',
+    diagram: 'diagrams',
+    domain: 'domains',
+    entity: 'entities',
+    event: 'events',
+    flow: 'flows',
+    query: 'queries',
+    service: 'services',
+  };
+
+  return routes[type] ?? `${type}s`;
+};
+
+const buildResourceUrl = (
+  catalogUrl: string | undefined,
+  consumer: SchemaConsumersResponse['consumers'][number]
+): string | undefined => {
+  const baseUrl = normalizeCatalogUrl(catalogUrl);
+
+  if (!baseUrl || !consumer.id.trim() || !consumer.type.trim()) {
+    return undefined;
+  }
+
+  const segments = ['docs', getResourceRoute(consumer.type), consumer.id, consumer.version].filter((segment) => segment.trim());
+  return `${baseUrl}/${segments.map(encodeUrlSegment).join('/')}`;
+};
+
+const buildOwnerUrl = (catalogUrl: string | undefined, owner: string): string | undefined => {
+  const baseUrl = normalizeCatalogUrl(catalogUrl);
+
+  if (!baseUrl || !owner.trim()) {
+    return undefined;
+  }
+
+  return `${baseUrl}/docs/teams/${encodeUrlSegment(owner)}`;
+};
+
 const formatReviewComment = ({ catalogPath, catalogPullRequestUrl, changedFiles, result }: ReviewCommentInput): string => {
   const files = changedFiles.length > 0 ? changedFiles.map((file) => `- \`${file}\``).join('\n') : '- No files reviewed';
   const summary = truncate(formatResult(result), MAX_RESULT_CHARS);
@@ -153,15 +212,27 @@ export interface BreakingSchemaReport {
   diagram?: SchemaConsumersResponse['diagram'];
 }
 
-const formatAffectedConsumer = (consumer: SchemaConsumersResponse['consumers'][number]): string => {
-  const summary = formatInlineText(consumer.summary || consumer.type);
-  const owners = consumer.owners.length > 0 ? `\n  - Owners: ${consumer.owners.map(formatInlineText).join(', ')}` : '';
+const formatOwner = (owner: string, catalogUrl: string | undefined): string => {
+  const label = formatInlineText(owner);
+  const url = buildOwnerUrl(catalogUrl, owner);
 
-  return `- ${formatInlineText(consumer.id)} (${formatInlineText(consumer.version)}) - ${summary}
+  return url ? formatMarkdownLink(label, url) : label;
+};
+
+const formatAffectedConsumer = (consumer: SchemaConsumersResponse['consumers'][number], catalogUrl?: string): string => {
+  const summary = formatInlineText(consumer.summary || consumer.type);
+  const resourceUrl = buildResourceUrl(catalogUrl, consumer);
+  const resource = resourceUrl ? formatMarkdownLink(formatInlineText(consumer.id), resourceUrl) : formatInlineText(consumer.id);
+  const owners =
+    consumer.owners.length > 0
+      ? `\n  - Owners: ${consumer.owners.map((owner) => formatOwner(owner, catalogUrl)).join(', ')}`
+      : '';
+
+  return `- ${resource} (${formatInlineText(consumer.version)}) - ${summary}
   - Reason: ${formatInlineText(consumer.reason)}${owners}`;
 };
 
-export const formatBreakingChangesComment = (reports: BreakingSchemaReport[]): string => {
+export const formatBreakingChangesComment = (reports: BreakingSchemaReport[], catalogUrl?: string): string => {
   const sections = reports
     .map(({ breakingChange, consumers, diagram }) => {
       const changes =
@@ -176,7 +247,7 @@ export const formatBreakingChangesComment = (reports: BreakingSchemaReport[]): s
 
       const consumersList =
         consumers.length > 0
-          ? consumers.map((consumer) => formatAffectedConsumer(consumer)).join('\n')
+          ? consumers.map((consumer) => formatAffectedConsumer(consumer, catalogUrl)).join('\n')
           : 'No consumers of this schema were found in the EventCatalog.';
 
       const flowDiagram = diagram?.trim() ? `#### Impact diagram\n\n${formatMermaidBlock(diagram)}\n\n` : '';
@@ -211,4 +282,4 @@ export const postBreakingChangesSummary = async (
   config: ReviewConfig,
   reports: BreakingSchemaReport[]
 ): Promise<string | undefined> =>
-  upsertPullRequestComment(config, BREAKING_CHANGES_COMMENT_MARKER, formatBreakingChangesComment(reports));
+  upsertPullRequestComment(config, BREAKING_CHANGES_COMMENT_MARKER, formatBreakingChangesComment(reports, config.catalogUrl));

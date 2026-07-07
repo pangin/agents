@@ -86,6 +86,27 @@ export const hasModelCredentials = (): boolean => {
   return keyEnv ? Boolean(process.env[keyEnv]) : false;
 };
 
+export const shouldSkipLiveModelEval = (): boolean => {
+  const provider = MODEL.split('/')[0];
+  const keyEnv = PROVIDER_KEY_ENV[provider];
+
+  if (!keyEnv) {
+    process.stderr.write(
+      `[eventcatalog:evals] Skipping live model evals: model "${MODEL}" uses provider "${provider}", but no required API key env var is configured for that provider. Known providers: ${Object.keys(
+        PROVIDER_KEY_ENV
+      ).join(', ')}.\n`
+    );
+    return true;
+  }
+
+  if (!process.env[keyEnv]) {
+    process.stderr.write(`[eventcatalog:evals] Skipping live model evals: set ${keyEnv} to run model "${MODEL}".\n`);
+    return true;
+  }
+
+  return false;
+};
+
 const git = (cwd: string, args: string[]) => exec('git', args, { cwd, maxBuffer: 1024 * 1024 * 20 });
 
 const setupWorkspace = async (fixture: string): Promise<string> => {
