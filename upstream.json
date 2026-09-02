@@ -17,9 +17,9 @@
     "pinnedAt": "2026-07-07T12:15:42+01:00",
     "pinnedTag": null,
     "fetched": "ed544eb00da486c8f7ec227f92b2c947186f8012",
-    "fetchedAt": "2026-09-02T06:07:17Z",
+    "fetchedAt": "2026-09-02T06:12:59Z",
     "integrated": "ed544eb00da486c8f7ec227f92b2c947186f8012",
-    "integratedAt": "2026-09-02T06:07:17Z"
+    "integratedAt": "2026-09-02T06:12:59Z"
   },
   "owner": {
     "github": "pangin",
@@ -38,17 +38,23 @@
   },
   "licenseBoundary": {
     "root": "BUSL-1.1 (Change Date 2030-06-25 → Apache-2.0)",
-    "commercialPaths": ["저장소 전체"],
+    "commercialPaths": [
+      "저장소 전체"
+    ],
     "productionRestriction": "Production Purpose 사용 금지(평가·개발·테스트만), production은 commercial license 필요",
     "licenseKeyEnvVars": [],
     "ossOnlyPolicy": "빌드·타입체크·오프라인 evals만.",
-    "licenseFiles": ["LICENSE"],
+    "licenseFiles": [
+      "LICENSE"
+    ],
     "noticeFiles": []
   },
   "build": {
     "node": "24.x",
     "packageManager": "pnpm",
-    "lockfiles": ["pnpm-lock.yaml"],
+    "lockfiles": [
+      "pnpm-lock.yaml"
+    ],
     "install": "pnpm install --frozen-lockfile",
     "build": "pnpm run build",
     "test": "n/a — upstream `pnpm test`(typecheck:evals + evals)는 pinned SHA의 clean install에서 실패함(TS2307: Cannot find module 'vite'); `pnpm run build`(tsc)까지만 검증",
@@ -74,6 +80,11 @@
     "appliedAt": null,
     "note": "GitHub rulesets on public repos (Free plan). appliedAt is filled when rulesets are active."
   },
-  "linear": ["GONG-871", "GONG-872", "GONG-876", "GONG-875"],
-  "generatedAt": "2026-09-02T06:07:17Z"
+  "linear": [
+    "GONG-871",
+    "GONG-872",
+    "GONG-876",
+    "GONG-875"
+  ],
+  "generatedAt": "2026-09-02T06:12:59Z"
 }

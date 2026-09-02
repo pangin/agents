@@ -162,6 +162,8 @@ jobs:
           NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           jq --arg f "$FETCHED" --arg t "$NOW" '.sha.fetched=$f | .sha.fetchedAt=$t | .sha.integrated=$f | .sha.integratedAt=$t' upstream.json > upstream.json.tmp
           mv upstream.json.tmp upstream.json
+          # keep the file prettier-clean so repos whose lint covers JSON stay green after a sync
+          if ls .prettierrc .prettierrc.json prettier.config.js .prettierrc.js > /dev/null 2>&1; then npx --yes prettier@3 --write upstream.json > /dev/null; fi
           git add upstream.json
           git commit -m "chore(upstream): record fetched/integrated SHA ${SHORT}"
           git push origin "$BR"
