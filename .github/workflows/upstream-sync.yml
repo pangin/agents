@@ -1,0 +1,187 @@
+# Upstream sync guardrail (fork-maintained; not an upstream file)
+#
+# Flow:  fetch upstream -> fast-forward check -> LICENSE/NOTICE change gate
+#        -> update vendor/upstream-main (approved sync identity only)
+#        -> sync/upstream-* branch + PR into main (merge commit only)
+# The bot never pushes to `main`. Humans never push to `vendor/upstream-main`.
+name: Upstream Sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      acknowledge_license_change:
+        description: "Owner reviewed LICENSE/NOTICE changes upstream and approves continuing"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "0 0 * * 1" # Mondays 00:00 UTC (09:00 KST)
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Read upstream.json
+        id: cfg
+        run: |
+          set -euo pipefail
+          test -f upstream.json
+          {
+            echo "upstream_url=$(jq -r .upstream.url upstream.json)"
+            echo "upstream_branch=$(jq -r .upstream.defaultBranch upstream.json)"
+            echo "vendor_branch=$(jq -r .branches.vendor upstream.json)"
+            echo "main_branch=$(jq -r .branches.main upstream.json)"
+            echo "integrated_sha=$(jq -r .sha.integrated upstream.json)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Fetch upstream (fetch-only remote) and vendor branch
+        env:
+          UPSTREAM_URL: ${{ steps.cfg.outputs.upstream_url }}
+          UPSTREAM_BRANCH: ${{ steps.cfg.outputs.upstream_branch }}
+          VENDOR_BRANCH: ${{ steps.cfg.outputs.vendor_branch }}
+        run: |
+          set -euo pipefail
+          git remote add upstream "$UPSTREAM_URL"
+          git remote set-url --push upstream DISABLED
+          git fetch --no-tags upstream "$UPSTREAM_BRANCH"
+          git fetch upstream --tags || echo "::warning::tag fetch from upstream failed (continuing)"
+          git fetch origin "$VENDOR_BRANCH"
+
+      - name: Compare (fast-forward + license gate)
+        id: cmp
+        env:
+          UPSTREAM_BRANCH: ${{ steps.cfg.outputs.upstream_branch }}
+          VENDOR_BRANCH: ${{ steps.cfg.outputs.vendor_branch }}
+          MAIN_BRANCH: ${{ steps.cfg.outputs.main_branch }}
+          INTEGRATED_SHA: ${{ steps.cfg.outputs.integrated_sha }}
+          ACK_LICENSE: ${{ inputs.acknowledge_license_change }}
+        run: |
+          set -euo pipefail
+          FETCHED=$(git rev-parse "upstream/$UPSTREAM_BRANCH")
+          VENDOR=$(git rev-parse "origin/$VENDOR_BRANCH")
+          MAIN=$(git rev-parse "origin/$MAIN_BRANCH")
+          echo "fetched=$FETCHED" >> "$GITHUB_OUTPUT"
+          echo "vendor=$VENDOR"   >> "$GITHUB_OUTPUT"
+          echo "main=$MAIN"       >> "$GITHUB_OUTPUT"
+          BEHIND_AHEAD=$(git rev-list --left-right --count "$FETCHED...$MAIN")
+          UPSTREAM_ONLY=${BEHIND_AHEAD%%	*}; INTERNAL_ONLY=${BEHIND_AHEAD##*	}
+          {
+            echo "## Upstream sync report"
+            echo "| item | value |"; echo "|---|---|"
+            echo "| upstream fetched SHA | \`$FETCHED\` |"
+            echo "| vendor branch SHA (before) | \`$VENDOR\` |"
+            echo "| last integrated SHA (upstream.json) | \`$INTEGRATED_SHA\` |"
+            echo "| main SHA | \`$MAIN\` |"
+            echo "| main is behind upstream by | $UPSTREAM_ONLY commits |"
+            echo "| main is ahead of upstream by (internal patches) | $INTERNAL_ONLY commits |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$FETCHED" = "$VENDOR" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Vendor branch already at upstream head; nothing to do." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          if ! git merge-base --is-ancestor "$VENDOR" "$FETCHED"; then
+            echo "::error::Upstream $UPSTREAM_BRANCH ($FETCHED) is NOT a fast-forward of $VENDOR_BRANCH ($VENDOR). History rewrite / non-fast-forward detected. Automatic sync halted — owner review required."
+            exit 1
+          fi
+          LICENSE_CHANGES=$(git diff --name-only "$VENDOR" "$FETCHED" -- ':(glob,icase)**/LICENSE*' ':(glob,icase)**/LICENCE*' ':(glob,icase)**/NOTICE*' ':(glob,icase)**/COPYING*' || true)
+          if [ -n "$LICENSE_CHANGES" ]; then
+            echo "### LICENSE/NOTICE files changed upstream" >> "$GITHUB_STEP_SUMMARY"
+            echo "$LICENSE_CHANGES" | sed 's/^/- /' >> "$GITHUB_STEP_SUMMARY"
+            if [ "$ACK_LICENSE" != "true" ]; then
+              echo "::error::LICENSE/NOTICE changed upstream: $(echo "$LICENSE_CHANGES" | tr '\n' ' '). Automatic sync halted — owner must review, then re-run with acknowledge_license_change=true."
+              exit 1
+            fi
+            echo "License change acknowledged by owner via workflow_dispatch input." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "### Internal patch diff (vendor -> main, before this sync)" >> "$GITHUB_STEP_SUMMARY"
+          { echo '```'; git diff --stat "$VENDOR" "$MAIN" | tail -n 40; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Update vendor branch (fast-forward, approved sync identity)
+        if: steps.cmp.outputs.changed == 'true'
+        env:
+          FETCHED: ${{ steps.cmp.outputs.fetched }}
+          VENDOR_BRANCH: ${{ steps.cfg.outputs.vendor_branch }}
+          SSH_KEY: ${{ secrets.UPSTREAM_SYNC_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${SSH_KEY:-}" ]; then
+            mkdir -p ~/.ssh && chmod 700 ~/.ssh
+            printf '%s\n' "$SSH_KEY" > ~/.ssh/upstream_sync && chmod 600 ~/.ssh/upstream_sync
+            echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" >> ~/.ssh/known_hosts
+            export GIT_SSH_COMMAND="ssh -i ~/.ssh/upstream_sync -o IdentitiesOnly=yes"
+            PUSH_URL="git@github.com:${GITHUB_REPOSITORY}.git"
+            echo "Pushing with deploy key (approved sync identity)."
+          else
+            echo "::warning::Secret UPSTREAM_SYNC_SSH_KEY is not set — falling back to GITHUB_TOKEN. Register the deploy key so that only the sync identity can update $VENDOR_BRANCH."
+            PUSH_URL="origin"
+          fi
+          git push "$PUSH_URL" "$FETCHED:refs/heads/$VENDOR_BRANCH"
+          set +e
+          git push "$PUSH_URL" 'refs/tags/*:refs/tags/*'
+          rc=$?
+          set -e
+          [ $rc -eq 0 ] || echo "::warning::Some upstream tags were rejected (tag moved upstream?). Existing tags are never overwritten."
+          echo "| vendor branch SHA (after) | \`$FETCHED\` |" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create sync branch and pull request into main
+        if: steps.cmp.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FETCHED: ${{ steps.cmp.outputs.fetched }}
+          VENDOR_BEFORE: ${{ steps.cmp.outputs.vendor }}
+          UPSTREAM_BRANCH: ${{ steps.cfg.outputs.upstream_branch }}
+          MAIN_BRANCH: ${{ steps.cfg.outputs.main_branch }}
+          INTEGRATED_SHA: ${{ steps.cfg.outputs.integrated_sha }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          SHORT=${FETCHED:0:12}
+          BR="sync/upstream-$(date -u +%Y%m%d)-${SHORT}"
+          git checkout -B "$BR" "origin/$MAIN_BRANCH"
+          if ! git merge --no-ff --no-edit -m "chore(upstream): merge upstream/${UPSTREAM_BRANCH} @ ${FETCHED}" "$FETCHED"; then
+            git merge --abort || true
+            echo "::error::Merge conflict between $MAIN_BRANCH and upstream $FETCHED. Vendor branch is updated; integration into $MAIN_BRANCH needs manual resolution by the owner (git merge --no-ff $FETCHED on a sync/upstream-* branch)."
+            exit 1
+          fi
+          NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          jq --arg f "$FETCHED" --arg t "$NOW" '.sha.fetched=$f | .sha.fetchedAt=$t | .sha.integrated=$f | .sha.integratedAt=$t' upstream.json > upstream.json.tmp
+          mv upstream.json.tmp upstream.json
+          git add upstream.json
+          git commit -m "chore(upstream): record fetched/integrated SHA ${SHORT}"
+          git push origin "$BR"
+          PATCH_STAT=$(git diff --stat "$FETCHED" "$BR" | tail -n 40)
+          UPSTREAM_LOG=$(git log --oneline "$VENDOR_BEFORE..$FETCHED" | head -n 60)
+          {
+            echo "Automated upstream sync (merge commit, ancestry preserved — do not squash or rebase)."
+            echo
+            echo "| item | value |"; echo "|---|---|"
+            echo "| upstream | \`${UPSTREAM_BRANCH}\` @ \`${FETCHED}\` |"
+            echo "| previous vendor SHA | \`${VENDOR_BEFORE}\` |"
+            echo "| previously integrated SHA | \`${INTEGRATED_SHA}\` |"
+            echo
+            echo "<details><summary>Upstream commits included</summary>"; echo; echo '```'; echo "$UPSTREAM_LOG"; echo '```'; echo "</details>"
+            echo
+            echo "<details><summary>Internal patch diff after sync (upstream -> this branch)</summary>"; echo; echo '```'; echo "$PATCH_STAT"; echo '```'; echo "</details>"
+            echo
+            echo "Checklist for the reviewer: LICENSE/NOTICE unchanged (or acknowledged), required checks green, merge with **Create a merge commit**."
+          } > pr-body.md
+          gh pr create --base "$MAIN_BRANCH" --head "$BR" --title "chore(upstream): sync ${UPSTREAM_BRANCH} @ ${SHORT}" --body-file pr-body.md
+          echo "branch=$BR" >> "$GITHUB_OUTPUT"
+          # PRs opened with GITHUB_TOKEN do not trigger pull_request workflows; dispatch the verify workflow explicitly.
+          gh workflow run fork-verify.yml --ref "$BR" || echo "::warning::could not dispatch fork-verify.yml for $BR"

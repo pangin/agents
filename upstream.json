@@ -1,0 +1,90 @@
+{
+  "$comment": "Machine-readable upstream metadata. Human guide: UPSTREAM.md. Updated by .github/workflows/upstream-sync.yml (sha.fetched/integrated) — never edit sha.pinned.",
+  "repository": "pangin/agents",
+  "upstream": {
+    "url": "https://github.com/event-catalog/agents.git",
+    "web": "https://github.com/event-catalog/agents",
+    "defaultBranch": "main",
+    "relation": "github-fork (public, inside the fork network)"
+  },
+  "branches": {
+    "main": "main",
+    "vendor": "vendor/upstream-main",
+    "syncBranchPrefix": "sync/upstream-"
+  },
+  "sha": {
+    "pinned": "ed544eb00da486c8f7ec227f92b2c947186f8012",
+    "pinnedAt": "2026-07-07T12:15:42+01:00",
+    "pinnedTag": null,
+    "fetched": "ed544eb00da486c8f7ec227f92b2c947186f8012",
+    "fetchedAt": "2026-09-02T05:59:15Z",
+    "integrated": "ed544eb00da486c8f7ec227f92b2c947186f8012",
+    "integratedAt": "2026-09-02T05:59:15Z"
+  },
+  "owner": {
+    "github": "pangin",
+    "name": "성욱 (pangin)"
+  },
+  "sync": {
+    "cadence": "매주 월요일 00:00 UTC (09:00 KST) 예약 실행 + workflow_dispatch 수동 실행",
+    "workflow": ".github/workflows/upstream-sync.yml",
+    "identity": "deploy key \"upstream-sync\" (secret UPSTREAM_SYNC_SSH_KEY); fallback GITHUB_TOKEN with warning",
+    "mergeStrategy": "merge commit only (squash/rebase disabled at repository level)",
+    "botPushesMain": false
+  },
+  "role": {
+    "classification": "excluded",
+    "reason": "Flue 기반 LLM 에이전트를 PR에서 실행하는 composite GitHub Action(BUSL-1.1, production 사용 제한). core clean run의 직접 의존이 아니며 스택 구성요소로서 사용자 지시에 따라 fork."
+  },
+  "licenseBoundary": {
+    "root": "BUSL-1.1 (Change Date 2030-06-25 → Apache-2.0)",
+    "commercialPaths": [
+      "저장소 전체"
+    ],
+    "productionRestriction": "Production Purpose 사용 금지(평가·개발·테스트만), production은 commercial license 필요",
+    "licenseKeyEnvVars": [],
+    "ossOnlyPolicy": "빌드·타입체크·오프라인 evals만.",
+    "licenseFiles": [
+      "LICENSE"
+    ],
+    "noticeFiles": []
+  },
+  "build": {
+    "node": "24.x",
+    "packageManager": "pnpm",
+    "lockfiles": [
+      "pnpm-lock.yaml"
+    ],
+    "install": "pnpm install --frozen-lockfile",
+    "build": "pnpm run build",
+    "test": "pnpm run typecheck:evals && pnpm run evals  # 라이브 모델 suite는 API key 없으면 자동 skip",
+    "run": "uses: pangin/agents@main (소비 저장소 workflow) 또는 pnpm exec flue run pr-review --root . --target node --payload '{\"workspace\":\"<checkout>\"}'",
+    "smoke": "install/build/typecheck:evals 성공, evals 실행(라이브 suite skip)",
+    "verifyWorkflow": ".github/workflows/fork-verify.yml"
+  },
+  "upstreamWorkflows": [],
+  "protection": {
+    "main": [
+      "pull-request-only",
+      "required review 1 (admin bypass for PR merge)",
+      "required checks: Fork Verify jobs",
+      "merge commit only",
+      "no force-push",
+      "no deletion"
+    ],
+    "vendor/upstream-main": [
+      "updates only by sync identity (deploy key)",
+      "no force-push",
+      "no deletion"
+    ],
+    "appliedAt": null,
+    "note": "GitHub rulesets on public repos (Free plan). appliedAt is filled when rulesets are active."
+  },
+  "linear": [
+    "GONG-871",
+    "GONG-872",
+    "GONG-876",
+    "GONG-875"
+  ],
+  "generatedAt": "2026-09-02T05:59:15Z"
+}

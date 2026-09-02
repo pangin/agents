@@ -1,0 +1,83 @@
+# Fork guardrail: clean build/run verification + vendor/metadata integrity (fork-maintained; not an upstream file)
+name: Fork Verify
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, "vendor/upstream-main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  metadata:
+    name: upstream.json / UPSTREAM.md consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate metadata
+        run: |
+          set -euo pipefail
+          test -f UPSTREAM.md && test -f upstream.json
+          jq -e . upstream.json > /dev/null
+          for k in .upstream.url .upstream.defaultBranch .branches.vendor .branches.main .sha.pinned .sha.fetched .sha.integrated .owner.github .sync.cadence .licenseBoundary.root; do
+            jq -e "$k" upstream.json > /dev/null || { echo "::error::upstream.json missing $k"; exit 1; }
+          done
+          for k in pinned fetched integrated; do
+            jq -r ".sha.$k" upstream.json | grep -Eq '^[0-9a-f]{40}$' || { echo "::error::.sha.$k is not a 40-hex SHA"; exit 1; }
+          done
+          echo "upstream.json OK"
+
+  vendor-integrity:
+    name: vendor/upstream-main contains only upstream commits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify vendor branch is an ancestor of upstream default branch
+        run: |
+          set -euo pipefail
+          UP_URL=$(jq -r .upstream.url upstream.json); UP_BR=$(jq -r .upstream.defaultBranch upstream.json); VENDOR=$(jq -r .branches.vendor upstream.json)
+          git remote add upstream "$UP_URL"; git fetch --no-tags upstream "$UP_BR"; git fetch --no-tags origin "$VENDOR"
+          V=$(git rev-parse "origin/$VENDOR"); U=$(git rev-parse "upstream/$UP_BR")
+          echo "vendor=$V upstream=$U"
+          git merge-base --is-ancestor "$V" "$U" || { echo "::error::$VENDOR ($V) is not an ancestor of upstream/$UP_BR ($U) — it contains non-upstream commits or upstream rewrote history."; exit 1; }
+          INTEGRATED=$(jq -r .sha.integrated upstream.json)
+          git merge-base --is-ancestor "$INTEGRATED" "$V" || { echo "::error::upstream.json .sha.integrated ($INTEGRATED) is not contained in $VENDOR ($V)"; exit 1; }
+          echo "ahead/behind (upstream-only<TAB>internal-only): $(git rev-list --left-right --count "$V...${GITHUB_SHA}")"
+
+  build:
+    name: Clean build/run (OSS-only, no license keys)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup pnpm 11
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - name: Setup Node.js 24.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: pnpm
+      - name: Record toolchain
+        run: |
+          { echo "## Toolchain"; echo '```'; echo "commit: $GITHUB_SHA"; echo "node: $(node --version 2>/dev/null || echo n/a)"; echo "pnpm: $(pnpm --version)"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Assert OSS-only environment (no license keys)
+        run: |
+          env | grep -E '^EVENTCATALOG_(SCALE|STARTER|LICENSE_KEY)' && { echo "::error::license key env vars present"; exit 1; } || echo "no EVENTCATALOG license env vars: OK"
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm run build
+      - name: Test
+        run: pnpm run typecheck:evals && pnpm run evals  # 라이브 모델 suite는 API key 없으면 자동 skip
+      - name: Smoke
+        run: |
+          echo 'agents: build + typecheck + offline evals passed'
